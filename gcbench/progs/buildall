@@ -1,0 +1,19 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" != -o -o $# != 2 ]; then
+    echo "usage: $0 -o <name>" >&2
+    exit 2
+fi
+
+OUT="$2"
+
+echo "#!/bin/sh" > $OUT.tmp
+echo "set -e" >> $OUT.tmp
+for f in *.go; do
+    go build -o $OUT.${f%.go} $f
+    echo "./$OUT.${f%.go}" >> $OUT.tmp
+done
+chmod a+x $OUT.tmp
+mv $OUT.tmp $OUT
