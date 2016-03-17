@@ -19,7 +19,7 @@ var sink1, sink2 interface{}
 
 var (
 	flagDuration = flag.Duration("benchtime", 20*time.Second, "steady state duration")
-	flagMB       = flag.Int("mb", 1<<10, "retain `x` MB of heap")
+	flagRetain   = gcbench.FlagBytes("retain", gcbench.GB, "retain `x` bytes of heap")
 	flagHeap     = flag.String("heap", "AST", "heap `shape`; either \"AST\" or \"deBruijn2\"")
 )
 
@@ -45,13 +45,13 @@ func main() {
 		os.Exit(2)
 	}
 
-	gcbench.NewBenchmark("LargeHeap", benchMain).Config("mb", *flagMB).Config("heap", *flagHeap).Run()
+	gcbench.NewBenchmark("LargeHeap", benchMain).Config("retain", *flagRetain).Config("heap", *flagHeap).Run()
 }
 
 func benchMain() {
 	m := heapgen.Measure(heapMaker)
 	println(m.BytesRetained, "bytes per graph")
-	sink1 = heapgen.Generate(m.Gen, m.BytesRetained, *flagMB<<20)
+	sink1 = heapgen.Generate(m.Gen, m.BytesRetained, int(*flagRetain))
 
 	// On my laptop for 1.5 and 1.6, this takes another ~10
 	// seconds to reach steady state.
