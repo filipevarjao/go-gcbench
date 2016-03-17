@@ -34,7 +34,7 @@ var sink interface{}
 var flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
 
 func main() {
-	gcbench.NewBenchmark("LargeBSS", benchMain).Config("mb", bssBytes>>20).Run()
+	gcbench.NewBenchmark("LargeBSS", benchMain).Config("bss", gcbench.Bytes(bssBytes)).Run()
 }
 
 func benchMain() {
