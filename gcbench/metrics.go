@@ -6,6 +6,7 @@ package gcbench
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -60,9 +61,11 @@ func heapOvershoot(t GCTrace) distribution {
 	actual := extract(t, "HeapActual").([]Bytes)
 	goal := extract(t, "HeapGoal").([]Bytes)
 	for i := range actual {
-		if goal[i] != 0 {
-			over = append(over, float64(actual[i])/float64(goal[i]))
+		// Ignore very small heaps.
+		if goal[i] < 10*MB {
+			continue
 		}
+		over = append(over, float64(actual[i])/float64(goal[i]))
 	}
 	return over
 }
@@ -125,6 +128,9 @@ func float64s(slice interface{}) []float64 {
 
 func pctile(xs []float64, pct float64) float64 {
 	sort.Float64s(xs)
+	if len(xs) == 0 {
+		return math.NaN()
+	}
 	return xs[int(float64(len(xs)-1)*pct)]
 }
 
