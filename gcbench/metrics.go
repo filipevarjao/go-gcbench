@@ -17,9 +17,12 @@ type Metric struct {
 
 var metrics = []Metric{
 	{"GCs/sec", gcsPerSec},
-	{"95%ile-ns/sweepTerm", nsPerSweepTerm95},
-	{"95%ile-ns/markTerm", nsPerMarkTerm95},
-	{"marked-MB/CPU/sec", markedMBPerCPUSec},
+	{"95%ile-ns/sweepTerm", distMetric(nsPerSweepTerm, 0.95)},
+	{"95%ile-ns/markTerm", distMetric(nsPerMarkTerm, 0.95)},
+	{"MB-marked/CPU/sec", markedMBPerCPUSec},
+	{"95%ile-heap-overshoot", distMetric(heapOvershoot, 0.95)},
+	{"5%ile-heap-overshoot", distMetric(heapOvershoot, 0.05)},
+	{"95%ile-CPU-util", distMetric(cpuUtil, 0.95)},
 }
 
 func gcsPerSec(t GCTrace) float64 {
@@ -30,21 +33,60 @@ func gcsPerSec(t GCTrace) float64 {
 	return float64(len(t)) / t[len(t)-1].End.Seconds()
 }
 
-func nsPerSweepTerm95(t GCTrace) float64 {
+func nsPerSweepTerm(t GCTrace) distribution {
 	t = t.WithoutForced()
-	return pctile(float64s(extract(t, "ClockSweepTerm").([]time.Duration)), .95)
+	return distribution(float64s(extract(t, "ClockSweepTerm").([]time.Duration)))
 }
 
-func nsPerMarkTerm95(t GCTrace) float64 {
+func nsPerMarkTerm(t GCTrace) distribution {
 	t = t.WithoutForced()
-	return pctile(float64s(extract(t, "ClockMarkTerm").([]time.Duration)), .95)
+	return distribution(float64s(extract(t, "ClockMarkTerm").([]time.Duration)))
 }
 
 func markedMBPerCPUSec(t GCTrace) float64 {
 	t = t.WithoutForced()
+	// Compute average overall rate.
 	markTotal := sum(float64s(extract(t, "CPUMark").([]time.Duration)))
 	markedTotal := sum(float64s(extract(t, "HeapMarked").([]Bytes)))
 	return markedTotal * 1e9 / (markTotal * 1024 * 1024)
+}
+
+func heapOvershoot(t GCTrace) distribution {
+	t = t.WithoutForced()
+	var over distribution
+	actual := extract(t, "HeapActual").([]Bytes)
+	goal := extract(t, "HeapGoal").([]Bytes)
+	for i := range actual {
+		if goal[i] != 0 {
+			over = append(over, float64(actual[i])/float64(goal[i]))
+		}
+	}
+	return over
+}
+
+func cpuUtil(t GCTrace) distribution {
+	t = t.WithoutForced()
+	var util distribution
+	cpuAssist := extract(t, "CPUAssist").([]time.Duration)
+	cpuBackground := extract(t, "CPUBackground").([]time.Duration)
+	clockMark := extract(t, "ClockMark").([]time.Duration)
+	procs := extract(t, "Procs").([]int)
+	for i := range cpuAssist {
+		if clockMark[i] != 0 {
+			util = append(util, (float64(cpuAssist[i])+float64(cpuBackground[i]))/(float64(clockMark[i])*float64(procs[i])))
+		}
+	}
+	return util
+}
+
+type distribution []float64
+
+// distMetric transforms a distribution metric into a point metric at
+// the specified percentile.
+func distMetric(f func(t GCTrace) distribution, pct float64) func(t GCTrace) float64 {
+	return func(t GCTrace) float64 {
+		return pctile([]float64(f(t)), pct)
+	}
 }
 
 // extract takes a slice []T where T is a struct and returns a slice
