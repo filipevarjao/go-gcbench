@@ -13,9 +13,9 @@ type node2 struct {
 // out-edges and 2 in-edges and the diameter of the graph is power.
 func MakeDeBruijn2(power int) interface{} {
 	const degree = 2
-	//numNodes := int(math.Pow(degree, power)) // General case
+	//numNodes := int(math.Pow(degree, float64(power))) // General case
 	numNodes := 1 << uint(power)
-	if power < 0 || numNodes >= 0 {
+	if power < 0 || numNodes <= 0 {
 		panic("bad power")
 	}
 	// Allocate all nodes.
