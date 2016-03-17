@@ -5,6 +5,8 @@
 package gcbench
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"time"
@@ -13,16 +15,17 @@ import (
 type Metric struct {
 	Label string
 	Fn    func(GCTrace) float64
+	Check func(name string, value float64)
 }
 
 var metrics = []Metric{
-	{"GCs/sec", gcsPerSec},
-	{"95%ile-ns/sweepTerm", distMetric(nsPerSweepTerm, 0.95)},
-	{"95%ile-ns/markTerm", distMetric(nsPerMarkTerm, 0.95)},
-	{"MB-marked/CPU/sec", markedMBPerCPUSec},
-	{"95%ile-heap-overshoot", distMetric(heapOvershoot, 0.95)},
-	{"5%ile-heap-overshoot", distMetric(heapOvershoot, 0.05)},
-	{"95%ile-CPU-util", distMetric(cpuUtil, 0.95)},
+	{"GCs/sec", gcsPerSec, nil},
+	{"95%ile-ns/sweepTerm", distMetric(nsPerSweepTerm, 0.95), warnIf(">=", 5e6)},
+	{"95%ile-ns/markTerm", distMetric(nsPerMarkTerm, 0.95), warnIf(">=", 5e6)},
+	{"MB-marked/CPU/sec", markedMBPerCPUSec, nil},
+	{"95%ile-heap-overshoot", distMetric(heapOvershoot, 0.95), warnIf(">", 1)},
+	{"5%ile-heap-overshoot", distMetric(heapOvershoot, 0.05), warnIf("<", .8)},
+	{"95%ile-CPU-util", distMetric(cpuUtil, 0.95), warnIf(">", .3)},
 }
 
 func gcsPerSec(t GCTrace) float64 {
@@ -131,4 +134,28 @@ func sum(xs []float64) float64 {
 		sum += x
 	}
 	return sum
+}
+
+// warnIf returns a metric check function that compares the metric
+// value to the threshold using the given comparison and prints a
+// warning if the comparison is true.
+func warnIf(compare string, threshold float64) func(string, float64) {
+	var fn func(a, b float64) bool
+	switch compare {
+	case ">":
+		fn = func(a, b float64) bool { return a > b }
+	case ">=":
+		fn = func(a, b float64) bool { return a >= b }
+	case "<=":
+		fn = func(a, b float64) bool { return a <= b }
+	case "<":
+		fn = func(a, b float64) bool { return a < b }
+	default:
+		panic(fmt.Sprintf("unknown comparison operator %q", compare))
+	}
+	return func(name string, value float64) {
+		if fn(value, threshold) {
+			fmt.Fprintf(os.Stderr, "Warning: %s %s %s %s\n", sigfigs(value), name, compare, sigfigs(threshold))
+		}
+	}
 }

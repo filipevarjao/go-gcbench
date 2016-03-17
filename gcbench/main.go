@@ -7,6 +7,7 @@ package gcbench
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"runtime"
@@ -83,10 +84,22 @@ func (b *Benchmark) Run() {
 	if os.Getenv("TERM") != "dumb" {
 		align = strings.Repeat("\t", 15) + " "
 	}
-	for _, metric := range metrics {
-		fmt.Printf("%s%10s %s", align, sigfigs(metric.Fn(gctrace)), metric.Label)
+	vals := make([]float64, len(metrics))
+	for i, metric := range metrics {
+		vals[i] = metric.Fn(gctrace)
+		if math.IsNaN(vals[i]) {
+			continue
+		}
+		fmt.Printf("%s%10s %s", align, sigfigs(vals[i]), metric.Label)
 	}
 	fmt.Printf("\n")
+
+	// Print warnings.
+	for i, metric := range metrics {
+		if metric.Check != nil && !math.IsNaN(vals[i]) {
+			metric.Check(metric.Label, vals[i])
+		}
+	}
 
 	// Print any non-GC output.
 	nongc := []string{}
