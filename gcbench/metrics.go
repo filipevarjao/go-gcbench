@@ -24,8 +24,8 @@ var metrics = []Metric{
 	{"95%ile-ns/sweepTerm", distMetric(nsPerSweepTerm, 0.95), warnIf(">=", 5e6)},
 	{"95%ile-ns/markTerm", distMetric(nsPerMarkTerm, 0.95), warnIf(">=", 5e6)},
 	{"MB-marked/CPU/sec", markedMBPerCPUSec, nil},
-	{"95%ile-heap-overshoot", distMetric(heapOvershoot, 0.95), warnIf(">", 1)},
-	{"5%ile-heap-overshoot", distMetric(heapOvershoot, 0.05), warnIf("<", .8)},
+	{"95%ile-heap-overshoot", distMetric(heapOvershoot, 0.95), warnIf(">", 0)},
+	{"5%ile-heap-overshoot", distMetric(heapOvershoot, 0.05), warnIf("<", -.2)},
 	{"95%ile-CPU-util", distMetric(cpuUtil, 0.95), warnIf(">", .3)},
 }
 
@@ -65,7 +65,7 @@ func heapOvershoot(t GCTrace) distribution {
 		if goal[i] < 10*MB {
 			continue
 		}
-		over = append(over, float64(actual[i])/float64(goal[i]))
+		over = append(over, float64(actual[i])/float64(goal[i])-1)
 	}
 	return over
 }
