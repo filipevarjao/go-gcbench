@@ -13,13 +13,18 @@ import (
 	"time"
 )
 
+type RunInfo struct {
+	Trace GCTrace
+}
+
 type Metric struct {
 	Label string
-	Fn    func(GCTrace) float64
+	Fn    func(RunInfo) float64
 	Check func(name string, value float64)
 }
 
 var metrics = []Metric{
+	{"GCs/op", gcsPerOp, nil},
 	{"GCs/sec", gcsPerSec, nil},
 	{"95%ile-ns/sweepTerm", distMetric(nsPerSweepTerm, 0.95), warnIf(">=", 5e6)},
 	{"95%ile-ns/markTerm", distMetric(nsPerMarkTerm, 0.95), warnIf(">=", 5e6)},
@@ -29,34 +34,39 @@ var metrics = []Metric{
 	{"95%ile-CPU-util", distMetric(cpuUtil, 0.95), warnIf(">", .5)},
 }
 
-func gcsPerSec(t GCTrace) float64 {
-	t = t.WithoutForced()
+func gcsPerOp(run RunInfo) float64 {
+	t := run.Trace.WithoutForced()
+	return float64(len(t))
+}
+
+func gcsPerSec(run RunInfo) float64 {
+	t := run.Trace.WithoutForced()
 	if len(t) == 0 {
 		return 0
 	}
 	return float64(len(t)) / t[len(t)-1].End.Seconds()
 }
 
-func nsPerSweepTerm(t GCTrace) distribution {
-	t = t.WithoutForced()
+func nsPerSweepTerm(run RunInfo) distribution {
+	t := run.Trace.WithoutForced()
 	return distribution(float64s(extract(t, "ClockSweepTerm").([]time.Duration)))
 }
 
-func nsPerMarkTerm(t GCTrace) distribution {
-	t = t.WithoutForced()
+func nsPerMarkTerm(run RunInfo) distribution {
+	t := run.Trace.WithoutForced()
 	return distribution(float64s(extract(t, "ClockMarkTerm").([]time.Duration)))
 }
 
-func markedMBPerCPUSec(t GCTrace) float64 {
-	t = t.WithoutForced()
+func markedMBPerCPUSec(run RunInfo) float64 {
+	t := run.Trace.WithoutForced()
 	// Compute average overall rate.
 	markTotal := sum(float64s(extract(t, "CPUMark").([]time.Duration)))
 	markedTotal := sum(float64s(extract(t, "HeapMarked").([]Bytes)))
 	return markedTotal * 1e9 / (markTotal * 1024 * 1024)
 }
 
-func heapOvershoot(t GCTrace) distribution {
-	t = t.WithoutForced()
+func heapOvershoot(run RunInfo) distribution {
+	t := run.Trace.WithoutForced()
 	var over distribution
 	actual := extract(t, "HeapActual").([]Bytes)
 	goal := extract(t, "HeapGoal").([]Bytes)
@@ -70,8 +80,8 @@ func heapOvershoot(t GCTrace) distribution {
 	return over
 }
 
-func cpuUtil(t GCTrace) distribution {
-	t = t.WithoutForced()
+func cpuUtil(run RunInfo) distribution {
+	t := run.Trace.WithoutForced()
 	var util distribution
 	cpuAssist := extract(t, "CPUAssist").([]time.Duration)
 	cpuBackground := extract(t, "CPUBackground").([]time.Duration)
@@ -89,9 +99,9 @@ type distribution []float64
 
 // distMetric transforms a distribution metric into a point metric at
 // the specified percentile.
-func distMetric(f func(t GCTrace) distribution, pct float64) func(t GCTrace) float64 {
-	return func(t GCTrace) float64 {
-		return pctile([]float64(f(t)), pct)
+func distMetric(f func(RunInfo) distribution, pct float64) func(RunInfo) float64 {
+	return func(run RunInfo) float64 {
+		return pctile([]float64(f(run)), pct)
 	}
 }
 

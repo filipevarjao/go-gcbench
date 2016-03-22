@@ -75,6 +75,8 @@ func (b *Benchmark) Run() {
 		return
 	}
 
+	run := RunInfo{Trace: gctrace}
+
 	// Print metrics.
 	fmt.Printf("%d", 1)
 	// The \t's are a horrible hack to keep everything technically
@@ -86,7 +88,7 @@ func (b *Benchmark) Run() {
 	}
 	vals := make([]float64, len(metrics))
 	for i, metric := range metrics {
-		vals[i] = metric.Fn(gctrace)
+		vals[i] = metric.Fn(run)
 		if math.IsNaN(vals[i]) {
 			continue
 		}
