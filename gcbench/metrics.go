@@ -24,7 +24,7 @@ type Metric struct {
 }
 
 var metrics = []Metric{
-	{"GCs/op", gcsPerOp, nil},
+	{"GCs/op", gcsPerOp, warnIf("<", 5)},
 	{"GCs/sec", gcsPerSec, nil},
 	{"95%ile-ns/sweepTerm", distMetric(nsPerSweepTerm, 0.95), warnIf(">=", 5e6)},
 	{"95%ile-ns/markTerm", distMetric(nsPerMarkTerm, 0.95), warnIf(">=", 5e6)},
