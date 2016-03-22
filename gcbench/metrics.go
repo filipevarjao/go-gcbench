@@ -15,6 +15,8 @@ import (
 
 type RunInfo struct {
 	Trace GCTrace
+
+	StartTime, EndTime time.Time
 }
 
 type Metric struct {
@@ -44,7 +46,10 @@ func gcsPerSec(run RunInfo) float64 {
 	if len(t) == 0 {
 		return 0
 	}
-	return float64(len(t)) / t[len(t)-1].End.Seconds()
+	// Use the time between the first non-forced GC and the end of
+	// execution.
+	duration := run.EndTime.Sub(run.StartTime) - t[0].Start
+	return float64(len(t)) / duration.Seconds()
 }
 
 func nsPerSweepTerm(run RunInfo) distribution {

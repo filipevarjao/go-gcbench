@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Benchmark struct {
@@ -62,11 +63,13 @@ func (b *Benchmark) Run() {
 
 	cmd := exec.Command(os.Args[0], os.Args[1:]...)
 	cmd.Env = append([]string{"GODEBUG=gctrace=1", "GCBENCH=" + b.FullName()}, os.Environ()...)
+	startTime := time.Now()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to run %s: %s\n%s\n", os.Args[0], err, indent(string(out)))
 		return
 	}
+	endTime := time.Now()
 
 	// Parse the GC trace.
 	gctrace, err := ParseGCTrace(string(out))
@@ -75,7 +78,7 @@ func (b *Benchmark) Run() {
 		return
 	}
 
-	run := RunInfo{Trace: gctrace}
+	run := RunInfo{Trace: gctrace, StartTime: startTime, EndTime: endTime}
 
 	// Print metrics.
 	fmt.Printf("%d", 1)
