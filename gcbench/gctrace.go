@@ -18,6 +18,9 @@ type GCCycle struct {
 	// N is the 1-based index of this GC cycle.
 	N int
 
+	// Format indicates the variant of the GC trace format for this line.
+	Format TraceFormat
+
 	// Start and End are the times this GC cycle started and
 	// ended, relative to when the program began executing.
 	Start, End time.Duration
@@ -61,6 +64,16 @@ type GCCycle struct {
 	Procs int
 }
 
+type TraceFormat int
+
+const (
+	// Trace1_5 is the trace format from Go 1.5.x.
+	Trace1_5 TraceFormat = 1 + iota
+
+	// Trace1_6 is the trace format from Go 1.6.x.
+	Trace1_6
+)
+
 var (
 	gcTraceLine  = regexp.MustCompile(`(?m)^gc #?([0-9]+) @([0-9.]+)s ([0-9]+)%: (.*)`)
 	gcTraceClock = regexp.MustCompile(`^([+0-9.]+) ms clock$`)
@@ -77,7 +90,7 @@ func ParseGCTrace(s string) (GCTrace, error) {
 		c := GCCycle{
 			N:     atoi(line[1]),
 			Start: time.Duration(atof(line[2]) * 1e9),
-			Util:  atof(line[3]),
+			Util:  atof(line[3]) / 100,
 		}
 
 		if strings.HasSuffix(line[4], " (forced)") {
@@ -101,12 +114,14 @@ func ParseGCTrace(s string) (GCTrace, error) {
 				c.End = c.Start + sum
 				switch len(phases) {
 				case 5: // Go 1.5
+					c.Format = Trace1_5
 					c.ClockSweepTerm = phases[0]
 					c.ClockRootScan = phases[1]
 					c.ClockSync = phases[2]
 					c.ClockMark = phases[3]
 					c.ClockMarkTerm = phases[4]
 				case 3: // Go 1.6
+					c.Format = Trace1_6
 					c.ClockSweepTerm = phases[0]
 					c.ClockMark = phases[1]
 					c.ClockMarkTerm = phases[2]

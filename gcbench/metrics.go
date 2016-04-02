@@ -93,6 +93,11 @@ func cpuUtil(run RunInfo) distribution {
 	clockMark := extract(t, "ClockMark").([]time.Duration)
 	procs := extract(t, "Procs").([]int)
 	for i := range cpuAssist {
+		if t[i].Format == Trace1_5 {
+			// 1.5 had some accounting problem that causes
+			// this to often go over 1.
+			continue
+		}
 		if clockMark[i] != 0 {
 			util = append(util, (float64(cpuAssist[i])+float64(cpuBackground[i]))/(float64(clockMark[i])*float64(procs[i])))
 		}
