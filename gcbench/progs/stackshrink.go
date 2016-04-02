@@ -10,6 +10,7 @@ package main
 import (
 	"flag"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -27,8 +28,9 @@ const (
 )
 
 var (
-	ballast []byte
-	garbage []byte
+	ballast   []byte
+	garbage   []byte
+	churnLock sync.Mutex
 )
 
 func churn() {
@@ -36,16 +38,20 @@ func churn() {
 
 	for {
 		time.Sleep(garbagePeriod)
+		churnLock.Lock()
 		garbage = make([]byte, garbageSize)
+		churnLock.Unlock()
 	}
 }
 
-func stack(a, b *sync.WaitGroup) {
+func stack(phase, a, b *sync.WaitGroup) {
 	withStack(*flagLow, func() {
 		for {
 			withStack(*flagHigh-*flagLow, func() {
+				phase.Done()
 				a.Wait()
 			})
+			phase.Done()
 			b.Wait()
 		}
 	})
@@ -76,7 +82,7 @@ func withStack1(size gcbench.Bytes, f func()) uintptr {
 }
 
 var (
-	flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
+	flagDuration = flag.Duration("benchtime", 20*time.Second, "steady state duration")
 	flagGs       = flag.Int("gs", 10000, "start `n` goroutines")
 	flagLow      = gcbench.FlagBytes("low", 0, "retain approximately `bytes` of stack")
 	flagHigh     = gcbench.FlagBytes("high", 10*gcbench.KB, "grow to approximately `bytes` of stack")
@@ -93,23 +99,44 @@ func main() {
 }
 
 func benchMain() {
+	churnLock.Lock()
 	go churn()
 
-	var a, b sync.WaitGroup
-	a.Add(1)
+	var phase, a, b sync.WaitGroup
+	phase.Add(*flagGs)
+	a.Add(1) // Grow stacks
 	for i := 0; i < *flagGs; i++ {
-		go stack(&a, &b)
+		go stack(&phase, &a, &b)
 	}
+	// Wait for all stacks to be big.
+	phase.Wait()
 
 	time.AfterFunc(*flagDuration, func() { os.Exit(0) })
 
 	for {
-		time.Sleep(stackPeriod / 2)
+		// Shrink all stacks.
+		phase.Add(*flagGs)
 		b.Add(1)
 		a.Add(-1)
+		phase.Wait()
 
-		time.Sleep(stackPeriod / 2)
+		// Let GC happen.
+		var mstats0, mstats1 runtime.MemStats
+		runtime.ReadMemStats(&mstats0)
+		churnLock.Unlock()
+		for {
+			time.Sleep(10 * time.Millisecond)
+			runtime.ReadMemStats(&mstats1)
+			if mstats1.NumGC >= mstats0.NumGC+2 {
+				break
+			}
+		}
+		churnLock.Lock()
+
+		// Grow all stacks.
+		phase.Add(*flagGs)
 		a.Add(1)
 		b.Add(-1)
+		phase.Wait()
 	}
 }
