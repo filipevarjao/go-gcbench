@@ -52,6 +52,9 @@ func (b *Benchmark) FullName() string {
 }
 
 func (b *Benchmark) Run() {
+	// TODO: Have a flag or some easy way to print the GC trace of
+	// the running benchmark.
+
 	if gcbench := os.Getenv("GCBENCH"); gcbench != "" {
 		if gcbench == b.FullName() {
 			b.main()
@@ -61,8 +64,14 @@ func (b *Benchmark) Run() {
 
 	fmt.Printf("%s\t", b.FullName())
 
+	godebug := os.Getenv("GODEBUG")
+	if godebug != "" {
+		godebug += ","
+	}
+	godebug += "gctrace=1"
+
 	cmd := exec.Command(os.Args[0], os.Args[1:]...)
-	cmd.Env = append([]string{"GODEBUG=gctrace=1", "GCBENCH=" + b.FullName()}, os.Environ()...)
+	cmd.Env = append([]string{"GODEBUG=" + godebug, "GCBENCH=" + b.FullName()}, os.Environ()...)
 	startTime := time.Now()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
