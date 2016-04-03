@@ -16,12 +16,13 @@ import (
 )
 
 const (
+	ptrSize = 4 << (^uintptr(0) >> 63)
+
 	ballastSize   = 100 << 20
 	garbageSize   = 10 << 20
 	garbagePeriod = 100 * time.Millisecond
 
 	stackPeriod = 50 * time.Millisecond
-	liveSize    = 1 << 10
 )
 
 var (
@@ -39,20 +40,45 @@ func churn() {
 }
 
 func live(ch chan struct{}) {
-	var s [liveSize]byte
-	for {
-		<-ch
-		// read/write the stack, so it doesn't go unused
-		for i := 0; i < len(s); i += 256 {
-			s[i]++
+	withStack(*flagStackSize, func() {
+		var x byte
+		for {
+			<-ch
+			x++
 		}
+	})
+}
+
+const frameSize = 512
+
+func withStack(size gcbench.Bytes, f func()) {
+	// TODO: Make this a gcbench package util?
+	if size < frameSize {
+		f()
+	} else {
+		withStack1(size, f)
 	}
+}
+
+func withStack1(size gcbench.Bytes, f func()) uintptr {
+	// Use frameSize bytes of stack frame.
+	var thing [(frameSize - 4*ptrSize) / ptrSize / 2]struct {
+		s uintptr
+		p *byte
+	}
+	if size <= frameSize {
+		f()
+	} else {
+		withStack1(size-frameSize, f)
+	}
+	return thing[0].s
 }
 
 var (
 	flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
 	// 5e5 Gs uses about 2.5GB of memory.
-	flagGs = flag.Int("gs", 5e5, "start `n` idle goroutines")
+	flagGs        = flag.Int("live-gs", 5e5, "start `n` live goroutines")
+	flagStackSize = gcbench.FlagBytes("stack-size", 1*gcbench.KB, "stack size")
 )
 
 func main() {
@@ -62,7 +88,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	gcbench.NewBenchmark("LiveGs", benchMain).Config("gs", *flagGs).Run()
+	gcbench.NewBenchmark("LiveGs", benchMain).Config("live-gs", *flagGs).Config("stack-size", *flagStackSize).Run()
 }
 
 func benchMain() {
@@ -76,14 +102,16 @@ func benchMain() {
 
 	go churn()
 
-	time.AfterFunc(10*time.Second, func() { os.Exit(0) })
+	time.AfterFunc(*flagDuration, func() { os.Exit(0) })
 
 	for range time.Tick(stackPeriod) {
+		//begin := time.Now()
 		for _, ch := range chs {
 			// TODO: Report jitter here. In
 			// gc-pause-time-alt-2 I introduced some nasty
 			// delay on this.
 			ch <- struct{}{}
 		}
+		//fmt.Println("loop took", time.Since(begin))
 	}
 }
