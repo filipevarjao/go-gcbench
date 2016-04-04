@@ -36,7 +36,7 @@ func churn() {
 var (
 	flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
 	// 5e5 Gs uses about 1.5GB of memory.
-	flagGs = flag.Int("gs", 5e5, "start `n` idle goroutines")
+	flagGs = flag.Int("idle-gs", 5e5, "start `n` idle goroutines")
 )
 
 func main() {
