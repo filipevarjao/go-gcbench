@@ -16,23 +16,23 @@ var si = []string{"", "k", "M", "G", "T", "P", "E", "Z", "Y"}
 const (
 	B Bytes = 1
 
-	KB = 1e3
-	MB = 1e6
-	GB = 1e9
-	TB = 1e12
-	PB = 1e15
-	EB = 1e18
-	ZB = 1e21
-	YB = 1e24
+	KB Bytes = 1e3
+	MB Bytes = 1e6
+	GB Bytes = 1e9
+	TB Bytes = 1e12
+	PB Bytes = 1e15
+	EB Bytes = 1e18
+	//ZB Bytes = 1e21
+	//YB Bytes = 1e24
 
-	KiB = 1 << 10
-	MiB = 1 << 20
-	GiB = 1 << 30
-	TiB = 1 << 40
-	PiB = 1 << 50
-	EiB = 1 << 60
-	ZiB = 1 << 70
-	YiB = 1 << 80
+	KiB Bytes = 1 << 10
+	MiB Bytes = 1 << 20
+	GiB Bytes = 1 << 30
+	TiB Bytes = 1 << 40
+	PiB Bytes = 1 << 50
+	EiB Bytes = 1 << 60
+	//ZiB Bytes = 1 << 70
+	//YiB Bytes = 1 << 80
 )
 
 func (b Bytes) String() string {
