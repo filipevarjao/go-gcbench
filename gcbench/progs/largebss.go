@@ -15,10 +15,10 @@ import (
 
 const ptrSize = 4 << (^uintptr(0) >> 63)
 
-const bssBytes = 1 << 30
+const bss = 100 * gcbench.MB
 
 // Pessimal case:
-var thing [bssBytes / (2 * ptrSize)]struct {
+var thing [bss / (2 * ptrSize)]struct {
 	x [ptrSize]byte
 	y *byte
 }
@@ -34,7 +34,7 @@ var sink interface{}
 var flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
 
 func main() {
-	gcbench.NewBenchmark("LargeBSS", benchMain).Config("bss", gcbench.Bytes(bssBytes)).Run()
+	gcbench.NewBenchmark("LargeBSS", benchMain).Config("bss", bss).Run()
 }
 
 func benchMain() {
