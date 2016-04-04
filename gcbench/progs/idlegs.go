@@ -46,7 +46,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	gcbench.NewBenchmark("IdleGs", benchMain).Config("gs", *flagGs).Run()
+	gcbench.NewBenchmark("IdleGs", benchMain).Config("idle-gs", *flagGs).Run()
 }
 
 func benchMain() {
