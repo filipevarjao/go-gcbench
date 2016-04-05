@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/aclements/go-gcbench/gcbench"
@@ -21,6 +22,7 @@ var (
 	flagDuration = flag.Duration("benchtime", 20*time.Second, "steady state duration")
 	flagRetain   = gcbench.FlagBytes("retain", gcbench.GB, "retain `x` bytes of heap")
 	flagHeap     = flag.String("heap", "AST", "heap `shape`; either \"AST\" or \"deBruijn2\"")
+	flagSTW      = flag.Bool("stw", false, "use STW GC")
 )
 
 var heapMaker func() interface{}
@@ -45,7 +47,12 @@ func main() {
 		os.Exit(2)
 	}
 
-	gcbench.NewBenchmark("LargeHeap", benchMain).Config("retain", *flagRetain).Config("heap", *flagHeap).Run()
+	name := "LargeHeap"
+	if *flagSTW {
+		// This is a fairly different benchmark.
+		name += "STW"
+	}
+	gcbench.NewBenchmark(name, benchMain).Config("retain", *flagRetain).Config("heap", *flagHeap).Run()
 }
 
 func benchMain() {
@@ -53,10 +60,16 @@ func benchMain() {
 	println(m.BytesRetained, "bytes per graph")
 	sink1 = heapgen.Generate(m.Gen, m.BytesRetained, int(*flagRetain))
 
+	// TODO: Measure allocation time distribution.
+
 	// On my laptop for 1.5 and 1.6, this takes another ~10
 	// seconds to reach steady state.
 	time.AfterFunc(*flagDuration, func() { os.Exit(0) })
 	for {
-		sink2 = m.Gen()
+		if *flagSTW {
+			runtime.GC()
+		} else {
+			sink2 = m.Gen()
+		}
 	}
 }
