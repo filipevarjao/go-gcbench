@@ -64,8 +64,8 @@ var configRe = regexp.MustCompile(`^(\p{Ll}[^\p{Lu}\s\x85\xa0\x{1680}\x{2000}-\x
 // configuration, indicating that the benchmark was run multiple
 // times.
 //
-// In the returned Benchmarks, all configuration values are strings.
-// Use ParseValues to convert them to more structured types.
+// In the returned Benchmarks, RawValue is set, but Value is always
+// nil. Use ParseValues to convert raw values to structured types.
 func Parse(r io.Reader) ([]*Benchmark, error) {
 	benchmarks := []*Benchmark{}
 	config := make(map[string]*Config)
@@ -81,7 +81,7 @@ func Parse(r io.Reader) ([]*Benchmark, error) {
 		// Configuration lines.
 		m := configRe.FindStringSubmatch(line)
 		if m != nil {
-			config[m[1]] = &Config{Value: m[2], RawValue: m[2], InBlock: true}
+			config[m[1]] = &Config{RawValue: m[2], InBlock: true}
 			continue
 		}
 
@@ -131,14 +131,14 @@ func parseBenchmark(line string, gconfig map[string]*Config) *Benchmark {
 		for _, part := range parts[1:] {
 			if i := strings.Index(part, ":"); i >= 0 {
 				k, v := part[:i], part[i+1:]
-				b.Config[k] = &Config{Value: v, RawValue: v}
+				b.Config[k] = &Config{RawValue: v}
 			}
 		}
 	} else if i := strings.LastIndex(name, "-"); i >= 0 {
 		_, err := strconv.Atoi(name[i+1:])
 		if err == nil {
 			b.Name = name[:i]
-			b.Config["gomaxprocs"] = &Config{Value: name[i+1:], RawValue: name[i+1:]}
+			b.Config["gomaxprocs"] = &Config{RawValue: name[i+1:]}
 		} else {
 			b.Name = name
 		}
@@ -177,9 +177,6 @@ var DefaultValueParsers = []ValueParser{
 	func(s string) (interface{}, error) { return time.ParseDuration(s) },
 }
 
-// TODO: If ParseValues was part of Parse, we could avoid repeatedly
-// parsing block configuration values.
-
 // ParseValues parses the raw configuration values in benchmarks into
 // structured types using best-effort pattern-based parsing.
 //
@@ -204,15 +201,25 @@ func ParseValues(benchmarks []*Benchmark, valueParsers []ValueParser) {
 	}
 
 	// For each configuration key, try value parsers in priority order.
-	values := make([]interface{}, len(benchmarks))
 	for key := range keys {
+		good := false
 	tryParsers:
 		for _, vp := range valueParsers {
-			good := true
-		tryValues:
-			for i, b := range benchmarks {
+			// Clear all values. This way we can detect
+			// aliasing and not parse the same value
+			// multiple times.
+			for _, b := range benchmarks {
 				c, ok := b.Config[key]
-				if !ok {
+				if ok {
+					c.Value = nil
+				}
+			}
+
+			good = true
+		tryValues:
+			for _, b := range benchmarks {
+				c, ok := b.Config[key]
+				if !ok || c.Value != nil {
 					continue
 				}
 
@@ -222,19 +229,29 @@ func ParseValues(benchmarks []*Benchmark, valueParsers []ValueParser) {
 					good = false
 					break tryValues
 				}
-
-				values[i] = res
+				c.Value = res
 			}
 
 			if good {
 				// This ValueParser converted all of
 				// the values.
-				for i, b := range benchmarks {
-					if _, ok := b.Config[key]; ok {
-						b.Config[key].Value = values[i]
-					}
-				}
 				break tryParsers
+			}
+		}
+		if !good {
+			// All of the value parsers failed. Fall back
+			// to strings.
+			for _, b := range benchmarks {
+				c, ok := b.Config[key]
+				if ok {
+					c.Value = nil
+				}
+			}
+			for _, b := range benchmarks {
+				c, ok := b.Config[key]
+				if ok && c.Value == nil {
+					c.Value = c.RawValue
+				}
 			}
 		}
 	}
