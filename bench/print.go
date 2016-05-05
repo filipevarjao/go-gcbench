@@ -99,7 +99,7 @@ func Fprint(w io.Writer, bs []*Benchmark) error {
 				// TODO: Syntax check.
 				name = append(name, fmt.Sprintf("%s:%s", k, config.RawValue))
 			}
-			if haveGMP {
+			if haveGMP && gomaxprocs != "1" {
 				if len(name) == 1 {
 					// Use short form.
 					name[0] = fmt.Sprintf("%s-%s", name[0], gomaxprocs)

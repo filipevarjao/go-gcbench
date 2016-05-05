@@ -145,6 +145,9 @@ func parseBenchmark(line string, gconfig map[string]*Config) *Benchmark {
 	} else {
 		b.Name = name
 	}
+	if b.Config["gomaxprocs"] == nil {
+		b.Config["gomaxprocs"] = &Config{RawValue: "1"}
+	}
 
 	// Parse iterations.
 	n, err := strconv.Atoi(f[1])
