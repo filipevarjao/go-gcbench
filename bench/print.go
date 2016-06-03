@@ -120,8 +120,8 @@ func Fprint(w io.Writer, bs []*Benchmark) error {
 			sort.Sort(resultKeySorter(resultKeys))
 			for _, k := range resultKeys {
 				result := b.Result[k]
-				// TODO: Syntax check.
-				line = append(line, fmt.Sprint(result), k)
+				// TODO: Syntax check k.
+				line = append(line, pretty(result), k)
 			}
 
 			lines = append(lines, line)
@@ -185,4 +185,14 @@ func (s resultKeySorter) Less(i, j int) bool {
 
 func (s resultKeySorter) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
+}
+
+// pretty returns x pretty-printed with at least three significant
+// figures.
+func pretty(val float64) string {
+	var prec int
+	for xval := val; xval < 99.95; xval *= 10 {
+		prec++
+	}
+	return fmt.Sprintf("%.*f", prec, val)
 }
