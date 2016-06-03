@@ -100,14 +100,34 @@ func Parse(r io.Reader) ([]*Benchmark, error) {
 	return benchmarks, nil
 }
 
-func parseBenchmark(line string, gconfig map[string]*Config) *Benchmark {
-	// TODO: Consider using scanner to avoid the slice allocation.
-	f := strings.Fields(line)
-	if len(f) < 4 {
-		return nil
+var fastSpace = [128]bool{
+	'\t': true, '\n': true, '\v': true, '\f': true, '\r': true, ' ': true,
+}
+
+func nextField(s string) (field, rest string) {
+	// Find beginning of field.
+	for i, c := range s {
+		if (i < 128 && !fastSpace[c]) || (i >= 128 && !unicode.IsSpace(c)) {
+			s = s[i:]
+			goto found
+		}
 	}
-	if f[0] != "Benchmark" {
-		next, _ := utf8.DecodeRuneInString(f[0][len("Benchmark"):])
+	return "", ""
+
+found:
+	// Find end of field.
+	for i, c := range s {
+		if (i < 128 && fastSpace[c]) || (i >= 128 && unicode.IsSpace(c)) {
+			return s[:i], s[i:]
+		}
+	}
+	return s, ""
+}
+
+func parseBenchmark(line string, gconfig map[string]*Config) *Benchmark {
+	name, line := nextField(line)
+	if name != "Benchmark" {
+		next, _ := utf8.DecodeRuneInString(name[len("Benchmark"):])
 		if !unicode.IsUpper(next) {
 			return nil
 		}
@@ -124,7 +144,7 @@ func parseBenchmark(line string, gconfig map[string]*Config) *Benchmark {
 	}
 
 	// Parse name and configuration.
-	name := strings.TrimPrefix(f[0], "Benchmark")
+	name = strings.TrimPrefix(name, "Benchmark")
 	if strings.Contains(name, "/") {
 		parts := strings.Split(name, "/")
 		b.Name = parts[0]
@@ -150,19 +170,35 @@ func parseBenchmark(line string, gconfig map[string]*Config) *Benchmark {
 	}
 
 	// Parse iterations.
-	n, err := strconv.Atoi(f[1])
+	iters, line := nextField(line)
+	if iters == "" {
+		return nil
+	}
+	n, err := strconv.Atoi(iters)
 	if err != nil || n <= 0 {
 		return nil
 	}
 	b.Iterations = n
 
 	// Parse results.
-	for i := 2; i+2 <= len(f); i += 2 {
-		val, err := strconv.ParseFloat(f[i], 64)
+	for i := 0; ; i++ {
+		var k, v string
+		v, line = nextField(line)
+		if v == "" {
+			if i == 0 {
+				return nil
+			}
+			break
+		}
+		val, err := strconv.ParseFloat(v, 64)
 		if err != nil {
 			continue
 		}
-		b.Result[f[i+1]] = val
+		k, line = nextField(line)
+		if k == "" {
+			return nil
+		}
+		b.Result[k] = val
 	}
 
 	return b
