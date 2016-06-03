@@ -127,6 +127,41 @@ func Fprint(w io.Writer, bs []*Benchmark) error {
 			lines = append(lines, line)
 		}
 
+		numeric := func(i int) bool {
+			return i >= 2 && i%2 == 0
+		}
+
+		// Align numeric columns on ".".
+		dwidths := make([]int, 0)
+		for _, line := range lines {
+			for i, elt := range line {
+				dwidth := 0
+				if i := strings.Index(elt, "."); i >= 0 {
+					dwidth = len(elt) - i
+				}
+				if i >= len(dwidths) {
+					dwidths = append(dwidths, dwidth)
+				} else if dwidth > dwidths[i] {
+					dwidths[i] = dwidth
+				}
+			}
+		}
+		for _, line := range lines {
+			for i, elt := range line {
+				if !numeric(i) {
+					continue
+				}
+				dwidth := dwidths[i]
+				if i := strings.Index(elt, "."); i == -1 {
+					elt += strings.Repeat(" ", dwidth)
+				} else {
+					cur := len(elt) - i
+					elt += strings.Repeat(" ", dwidth-cur)
+				}
+				line[i] = elt
+			}
+		}
+
 		// Compute column widths.
 		widths := make([]int, 0)
 		for _, line := range lines {
@@ -144,9 +179,12 @@ func Fprint(w io.Writer, bs []*Benchmark) error {
 			for i, elt := range line {
 				var err error
 				p := widths[i]
-				if i == 1 || i >= 2 && i%2 == 0 {
-					// Right align.
+				if i == 1 {
+					// Right align N.
 					_, err = fmt.Fprintf(w, "%*s  ", p, elt)
+				} else if numeric(i) {
+					// Right align result.
+					_, err = fmt.Fprintf(w, "%*s ", p, elt)
 				} else if i < len(line)-1 {
 					// Left align and pad.
 					_, err = fmt.Fprintf(w, "%-*s  ", p, elt)
