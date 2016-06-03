@@ -12,10 +12,12 @@ import (
 	"strings"
 )
 
+// Print pretty-prints bs to stdout in standard benchmark format.
 func Print(bs []*Benchmark) error {
 	return Fprint(os.Stdout, bs)
 }
 
+// Fprint pretty-prints bs to w in standard benchmark format.
 func Fprint(w io.Writer, bs []*Benchmark) error {
 	type kv struct {
 		k, v string
