@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -80,6 +81,28 @@ func (b *Benchmark) Run() {
 	}
 	endTime := time.Now()
 
+	// Parse extra metrics.
+	extra := map[string]float64{}
+	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
+		if !strings.HasPrefix(line, "metric ") {
+			continue
+		}
+		fs := strings.Fields(line)
+		if len(fs) != 3 {
+			continue
+		}
+		v, err := strconv.ParseFloat(fs[1], 64)
+		if err != nil {
+			continue
+		}
+		extra[fs[2]] = v
+	}
+	extraKeys := []string{}
+	for k := range extra {
+		extraKeys = append(extraKeys, k)
+	}
+	sort.Strings(extraKeys)
+
 	// Parse the GC trace.
 	gctrace, err := ParseGCTrace(string(out))
 	if err != nil {
@@ -106,6 +129,9 @@ func (b *Benchmark) Run() {
 		}
 		fmt.Printf("%s%10s %s", align, sigfigs(vals[i]), metric.Label)
 	}
+	for _, k := range extraKeys {
+		fmt.Printf("%s%10s %s", align, sigfigs(extra[k]), k)
+	}
 	fmt.Printf("\n")
 
 	// Print warnings.
@@ -118,7 +144,7 @@ func (b *Benchmark) Run() {
 	// Print any non-GC output.
 	nongc := []string{}
 	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
-		if !strings.HasPrefix(line, "gc ") {
+		if !strings.HasPrefix(line, "gc ") && !strings.HasPrefix(line, "metric ") {
 			nongc = append(nongc, line)
 		}
 	}
@@ -141,4 +167,10 @@ func sigfigs(v float64) string {
 		m *= 10
 		prec++
 	}
+}
+
+// ReportExtra can be used by a benchmark main function to report
+// extra metrics.
+func ReportExtra(metric string, val float64) {
+	fmt.Fprintf(os.Stderr, "metric %v %s\n", val, metric)
 }
