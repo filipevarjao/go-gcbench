@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/aclements/go-gcbench/gcbench"
@@ -60,16 +61,24 @@ func benchMain() {
 	println(m.BytesRetained, "bytes per graph")
 	sink1 = heapgen.Generate(m.Gen, m.BytesRetained, int(*flagRetain))
 
-	// TODO: Measure allocation time distribution.
+	// TODO: Report more of the allocation time distribution.
 
 	// On my laptop for 1.5 and 1.6, this takes another ~10
 	// seconds to reach steady state.
-	time.AfterFunc(*flagDuration, func() { os.Exit(0) })
+	var latDist gcbench.LatencyDist
+	time.AfterFunc(*flagDuration, func() {
+		maxLat := atomic.LoadInt64((*int64)(&latDist.Max))
+		gcbench.ReportExtra("max-latency-ns", float64(maxLat))
+		os.Exit(0)
+	})
+	lat := latDist.Start()
 	for {
 		if *flagSTW {
 			runtime.GC()
 		} else {
 			sink2 = m.Gen()
 		}
+		lat.Tick()
 	}
+	lat.Done() // For completeness.
 }
