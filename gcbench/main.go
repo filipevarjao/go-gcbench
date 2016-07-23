@@ -6,16 +6,23 @@ package gcbench
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"math"
 	"os"
 	"os/exec"
 	"runtime"
+	"runtime/trace"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// TODO: Having the benchmarks all os.Exit to finish is a pain for
+// things like metrics reporting and tracing.
+
+var flagTrace = flag.String("trace", "", "write execution trace to `file`")
 
 type Benchmark struct {
 	name string
@@ -58,7 +65,18 @@ func (b *Benchmark) Run() {
 
 	if gcbench := os.Getenv("GCBENCH"); gcbench != "" {
 		if gcbench == b.FullName() {
-			b.main()
+			func() {
+				if *flagTrace != "" {
+					f, err := os.Create(*flagTrace)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "error creating log file: %v\n", err)
+						os.Exit(1)
+					}
+					trace.Start(f)
+					defer trace.Stop()
+				}
+				b.main()
+			}()
 		}
 		os.Exit(0)
 	}
