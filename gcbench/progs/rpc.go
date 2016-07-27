@@ -181,6 +181,7 @@ func doClient(addr string) {
 		}
 		fmt.Fprintln(os.Stderr, "client-measured request latency:")
 		lat.Fprint(os.Stderr)
+		fmt.Fprintln(os.Stderr, "P99", lat.Quantile(0.99), "P99.9", lat.Quantile(0.999), "max", lat.Max)
 		//log.Print("client exiting")
 		os.Exit(0)
 	}()

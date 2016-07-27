@@ -89,6 +89,25 @@ func (d *LatencyDist) Fprint(w io.Writer) {
 	}
 }
 
+func (d *LatencyDist) Quantile(q float64) time.Duration {
+	// Find the bucket containing this quantile.
+	n := int64(q * float64(d.N+1))
+	if n < 0 {
+		n = 0
+	}
+	if n > d.N-1 {
+		n = d.N - 1
+	}
+	b := 0
+	for ; n >= d.Buckets[b]; n, b = n-d.Buckets[b], b+1 {
+	}
+
+	// Take the midpoint of this bucket.
+	// TODO: Assume samples are log distributed in bucket.
+	lo, hi := d.FromBucket(b)
+	return (lo + hi) / 2
+}
+
 type LatencyTracker struct {
 	dist *LatencyDist
 	last time.Time
