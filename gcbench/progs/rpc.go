@@ -33,7 +33,7 @@ import (
 	"time"
 
 	"github.com/aclements/go-gcbench/gcbench"
-	"golang.org/x/benchmarks/gcbench.newer/heapgen"
+	"github.com/aclements/go-gcbench/gcbench/heapgen"
 )
 
 var (
