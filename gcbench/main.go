@@ -23,6 +23,7 @@ import (
 // things like metrics reporting and tracing.
 
 var flagTrace = flag.String("trace", "", "write execution trace to `file`")
+var flagGCTrace = flag.Bool("gctrace", false, "print gctrace of benchmark")
 
 type Benchmark struct {
 	name string
@@ -162,7 +163,7 @@ func (b *Benchmark) Run() {
 	// Print any non-GC output.
 	nongc := []string{}
 	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
-		if !strings.HasPrefix(line, "gc ") && !strings.HasPrefix(line, "metric ") {
+		if *flagGCTrace || !strings.HasPrefix(line, "gc ") && !strings.HasPrefix(line, "metric ") {
 			nongc = append(nongc, line)
 		}
 	}
