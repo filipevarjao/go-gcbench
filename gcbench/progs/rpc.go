@@ -180,8 +180,10 @@ func doClient(addr string) {
 			c.Close()
 		}
 		fmt.Fprintln(os.Stderr, "client-measured request latency:")
-		lat.Fprint(os.Stderr)
-		fmt.Fprintln(os.Stderr, "P99", lat.Quantile(0.99), "P99.9", lat.Quantile(0.999), "max", lat.Max)
+		lat.FprintHist(os.Stderr, 70, 5)
+		gcbench.ReportExtra("P99-latency-ns", float64(lat.Quantile(0.99)))
+		gcbench.ReportExtra("P99.9-latency-ns", float64(lat.Quantile(0.999)))
+		gcbench.ReportExtra("max-latency-ns", float64(lat.Max))
 		//log.Print("client exiting")
 		os.Exit(0)
 	}()
