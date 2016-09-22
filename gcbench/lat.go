@@ -69,23 +69,130 @@ func (d *LatencyDist) FromBucket(b int) (lo, hi time.Duration) {
 	return
 }
 
-func (d *LatencyDist) Fprint(w io.Writer) {
-	minb, maxb := -1, 1
+func (d *LatencyDist) bounds() (minb, maxb int, any bool) {
+	minb, maxb = -1, 1
 	for i, count := range d.Buckets {
 		if count > 0 {
 			if minb == -1 {
 				minb = i
 			}
-			maxb = i
+			maxb = i + 1
 		}
 	}
-	if minb == -1 {
+	any = minb != -1
+	return
+}
+
+func (d *LatencyDist) Fprint(w io.Writer) {
+	minb, maxb, any := d.bounds()
+	if !any {
 		fmt.Fprintf(w, "no samples\n")
 		return
 	}
-	for b := minb; b <= maxb; b++ {
+	for b := minb; b < maxb; b++ {
 		lo, hi := d.FromBucket(b)
 		fmt.Fprintf(w, "[%12s,%12s) %d\n", lo, hi, d.Buckets[b])
+	}
+}
+
+// FprintHist renders d to w as an ASCII art histogram.
+//
+// The body of the plot will fit within a width x height cell box.
+// Ticks and tick labels will be placed outside that box.
+func (d *LatencyDist) FprintHist(w io.Writer, width, height int) {
+	minb, maxb, any := d.bounds()
+	if !any {
+		fmt.Fprintf(w, "no samples\n")
+		return
+	}
+
+	// Compute plot column counts.
+	//
+	// TODO: This is careful to combine integer numbers of
+	// buckets, but this results in weird shifts in the actual
+	// width of the histogram. We could just pick the number of
+	// columns and split buckets that straddle columns
+	// proportionately.
+	factor := int(1 + float64(maxb-minb)/float64(width))
+	bodyCols := (maxb - minb + factor - 1) / factor
+	cols := make([]int64, bodyCols)
+	for b := minb; b < maxb; b++ {
+		cols[(b-minb)/factor] += d.Buckets[b]
+	}
+
+	// Get max column value.
+	maxCount := int64(0)
+	for _, count := range cols {
+		if count > maxCount {
+			maxCount = count
+		}
+	}
+
+	// Render histogram body.
+	fills := []rune(" ▁▂▃▄▅▆▇█")
+	cells := make([][]rune, height+2)
+	for i := range cells {
+		cells[i] = make([]rune, bodyCols)
+		for j := range cells[i] {
+			cells[i][j] = fills[0]
+		}
+	}
+	maxBar := float64(height) - 0.5
+	for col, count := range cols {
+		if count == 0 {
+			continue
+		}
+		frac := maxBar * math.Log(float64(count)) / math.Log(float64(maxCount))
+		for row := 0; row < height; row++ {
+			filled := int((frac - float64(row)) * float64(len(fills)))
+			if row == 0 && count > 0 && filled <= 0 {
+				// Ensure we show something for
+				// non-empty buckets.
+				filled = 1
+			} else if filled < 0 {
+				filled = 0
+			} else if filled >= len(fills) {
+				filled = len(fills) - 1
+			}
+			cells[height-row-1][col] = fills[filled]
+		}
+	}
+
+	// Render X ticks. Start with the first power of xBase >= minb.
+	const xBase = 10
+	mint, _ := d.FromBucket(minb)
+	tick := time.Duration(math.Pow(xBase, math.Ceil(math.Log(float64(mint))/math.Log(xBase))))
+	tickRow, labelRow := &cells[height], &cells[height+1]
+	for {
+		col := (d.ToBucket(tick) - minb) / factor
+		if col >= bodyCols {
+			break
+		}
+
+		(*tickRow)[col] = '╵'
+		label := []rune(tick.String())
+		start := col - len(label)/2
+		n := copy((*labelRow)[start:], label)
+		if n < len(label) {
+			// Extend the row to fit the label.
+			*labelRow = append(*labelRow, label[n:]...)
+		}
+		tick *= xBase
+	}
+
+	// Render Y ticks.
+	for row := 0; row < height; row++ {
+		// Compute the value at mid-row. This is the inverse
+		// of the "frac" calculation above.
+		frac := 0.5 + float64(row)
+		count := math.Exp(frac * math.Log(float64(maxCount)) / maxBar)
+		label := fmt.Sprintf("╴%d", int(count+0.5))
+		cells[height-row-1] = append(cells[height-row-1], []rune(label)...)
+	}
+
+	// Print results.
+	for _, row := range cells {
+		fmt.Fprint(w, string(row), "\n")
 	}
 }
 
