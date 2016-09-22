@@ -20,23 +20,12 @@ const (
 	// The ballast has to be reasonably large (and have pointers)
 	// so concurrent mark takes more than stackHighTime.
 	ballastSize   = 128 << 20
-	garbageSize   = 1 << 20
-	garbagePeriod = 1 * time.Millisecond
+	garbagePerSec = 1000 << 20
 
 	stackHighTime = 10 * time.Millisecond
 )
 
-var (
-	ballast interface{}
-	garbage []byte
-)
-
-func churn() {
-	for {
-		time.Sleep(garbagePeriod)
-		garbage = make([]byte, garbageSize)
-	}
-}
+var ballast interface{}
 
 func stack(id int) {
 	for {
@@ -93,7 +82,10 @@ func benchMain() {
 	for i := 0; i < *flagGs; i++ {
 		go stack(i)
 	}
-	go churn()
+
+	(&gcbench.Churner{
+		BytesPerSec: garbagePerSec,
+	}).Start()
 
 	time.Sleep(*flagDuration)
 	os.Exit(0)

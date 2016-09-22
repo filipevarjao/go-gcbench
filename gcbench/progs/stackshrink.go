@@ -21,28 +21,10 @@ const (
 	ptrSize = 4 << (^uintptr(0) >> 63)
 
 	ballastSize   = 10 << 20
-	garbageSize   = 1 << 20
-	garbagePeriod = 100 * time.Millisecond
+	garbagePerSec = 10 << 20
 
 	stackPeriod = 5 * time.Second
 )
-
-var (
-	ballast   []byte
-	garbage   []byte
-	churnLock sync.Mutex
-)
-
-func churn() {
-	ballast = make([]byte, ballastSize)
-
-	for {
-		time.Sleep(garbagePeriod)
-		churnLock.Lock()
-		garbage = make([]byte, garbageSize)
-		churnLock.Unlock()
-	}
-}
 
 func stack(phase, a, b *sync.WaitGroup) {
 	withStack(*flagLow, func() {
@@ -99,8 +81,10 @@ func main() {
 }
 
 func benchMain() {
-	churnLock.Lock()
-	go churn()
+	var churn = gcbench.Churner{
+		BallastBytes: ballastSize,
+		BytesPerSec:  garbagePerSec,
+	}
 
 	var phase, a, b sync.WaitGroup
 	phase.Add(*flagGs)
@@ -123,7 +107,7 @@ func benchMain() {
 		// Let GC happen.
 		var mstats0, mstats1 runtime.MemStats
 		runtime.ReadMemStats(&mstats0)
-		churnLock.Unlock()
+		churn.Start()
 		for {
 			time.Sleep(10 * time.Millisecond)
 			runtime.ReadMemStats(&mstats1)
@@ -131,7 +115,7 @@ func benchMain() {
 				break
 			}
 		}
-		churnLock.Lock()
+		churn.Stop()
 
 		// Grow all stacks.
 		phase.Add(*flagGs)
