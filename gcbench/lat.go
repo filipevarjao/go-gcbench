@@ -26,7 +26,7 @@ func (d *LatencyDist) Start() *LatencyTracker {
 	return &LatencyTracker{dist: d, last: time.Now()}
 }
 
-func (d *LatencyDist) add(t time.Duration) {
+func (d *LatencyDist) Add(t time.Duration) {
 	atomic.AddInt64(&d.N, 1)
 
 	max := time.Duration(atomic.LoadInt64((*int64)(&d.Max)))
@@ -115,7 +115,7 @@ type LatencyTracker struct {
 
 func (t *LatencyTracker) Tick() {
 	now := time.Now()
-	t.dist.add(now.Sub(t.last))
+	t.dist.Add(now.Sub(t.last))
 	t.last = now
 }
 
