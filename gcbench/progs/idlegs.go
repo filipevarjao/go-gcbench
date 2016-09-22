@@ -14,8 +14,6 @@ import (
 )
 
 const (
-	ptrSize = 4 << (^uintptr(0) >> 63)
-
 	ballastSize   = 100 << 20
 	garbagePerSec = 100 << 20
 )
@@ -26,31 +24,6 @@ var (
 	flagGs        = flag.Int("idle-gs", 5e5, "start `n` idle goroutines")
 	flagStackSize = gcbench.FlagBytes("stack-size", 0, "stack size")
 )
-
-const frameSize = 512
-
-func withStack(size gcbench.Bytes, f func()) {
-	// TODO: Make this a gcbench package util?
-	if size < frameSize {
-		f()
-	} else {
-		withStack1(size, f)
-	}
-}
-
-func withStack1(size gcbench.Bytes, f func()) uintptr {
-	// Use frameSize bytes of stack frame.
-	var thing [(frameSize - 4*ptrSize) / ptrSize / 2]struct {
-		s uintptr
-		p *byte
-	}
-	if size <= frameSize {
-		f()
-	} else {
-		withStack1(size-frameSize, f)
-	}
-	return thing[0].s
-}
 
 func main() {
 	flag.Parse()
@@ -68,7 +41,7 @@ func benchMain() {
 			go func() { select {} }()
 		} else {
 			go func() {
-				withStack(*flagStackSize, func() {
+				gcbench.WithStack(*flagStackSize, func() {
 					select {}
 				})
 			}()

@@ -18,8 +18,6 @@ import (
 )
 
 const (
-	ptrSize = 4 << (^uintptr(0) >> 63)
-
 	ballastSize   = 10 << 20
 	garbagePerSec = 10 << 20
 
@@ -27,9 +25,9 @@ const (
 )
 
 func stack(phase, a, b *sync.WaitGroup) {
-	withStack(*flagLow, func() {
+	gcbench.WithStack(*flagLow, func() {
 		for {
-			withStack(*flagHigh-*flagLow, func() {
+			gcbench.WithStack(*flagHigh-*flagLow, func() {
 				phase.Done()
 				a.Wait()
 			})
@@ -37,30 +35,6 @@ func stack(phase, a, b *sync.WaitGroup) {
 			b.Wait()
 		}
 	})
-}
-
-const frameSize = 512
-
-func withStack(size gcbench.Bytes, f func()) {
-	if size < frameSize {
-		f()
-	} else {
-		withStack1(size, f)
-	}
-}
-
-func withStack1(size gcbench.Bytes, f func()) uintptr {
-	// Use frameSize bytes of stack frame.
-	var thing [(frameSize - 4*ptrSize) / ptrSize / 2]struct {
-		s uintptr
-		p *byte
-	}
-	if size <= frameSize {
-		f()
-	} else {
-		withStack1(size-frameSize, f)
-	}
-	return thing[0].s
 }
 
 var (

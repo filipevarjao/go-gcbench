@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	ptrSize = 4 << (^uintptr(0) >> 63)
-
 	// The ballast has to be reasonably large (and have pointers)
 	// so concurrent mark takes more than stackHighTime.
 	ballastSize   = 128 << 20
@@ -29,34 +27,10 @@ var ballast interface{}
 
 func stack(id int) {
 	for {
-		withStack(*flagDirtyStack, func() {
+		gcbench.WithStack(*flagDirtyStack, func() {
 			time.Sleep(stackHighTime)
 		})
 	}
-}
-
-const frameSize = 512
-
-func withStack(size gcbench.Bytes, f func()) {
-	if size < frameSize {
-		f()
-	} else {
-		withStack1(size, f)
-	}
-}
-
-func withStack1(size gcbench.Bytes, f func()) uintptr {
-	// Use frameSize bytes of stack frame.
-	var thing [(frameSize - 4*ptrSize) / ptrSize / 2]struct {
-		s uintptr
-		p *byte
-	}
-	if size <= frameSize {
-		f()
-	} else {
-		withStack1(size-frameSize, f)
-	}
-	return thing[0].s
 }
 
 var (

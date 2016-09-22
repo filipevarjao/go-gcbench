@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	ptrSize = 4 << (^uintptr(0) >> 63)
-
 	// The ballast has to be reasonably large (and have pointers)
 	// so concurrent mark takes more than stackPeriod.
 	ballastSize   = 100 << 20
@@ -30,38 +28,13 @@ const (
 var ballast interface{}
 
 func live(ch chan struct{}) {
-	withStack(*flagStackSize, func() {
+	gcbench.WithStack(*flagStackSize, func() {
 		var x byte
 		for {
 			<-ch
 			x++
 		}
 	})
-}
-
-const frameSize = 512
-
-func withStack(size gcbench.Bytes, f func()) {
-	// TODO: Make this a gcbench package util?
-	if size < frameSize {
-		f()
-	} else {
-		withStack1(size, f)
-	}
-}
-
-func withStack1(size gcbench.Bytes, f func()) uintptr {
-	// Use frameSize bytes of stack frame.
-	var thing [(frameSize - 4*ptrSize) / ptrSize / 2]struct {
-		s uintptr
-		p *byte
-	}
-	if size <= frameSize {
-		f()
-	} else {
-		withStack1(size-frameSize, f)
-	}
-	return thing[0].s
 }
 
 var (
