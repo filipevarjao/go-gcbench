@@ -106,18 +106,45 @@ func (d *LatencyDist) FprintHist(w io.Writer, width, height int) {
 		return
 	}
 
-	// Compute plot column counts.
-	//
-	// TODO: This is careful to combine integer numbers of
-	// buckets, but this results in weird shifts in the actual
-	// width of the histogram. We could just pick the number of
-	// columns and split buckets that straddle columns
-	// proportionately.
-	factor := int(1 + float64(maxb-minb)/float64(width))
-	bodyCols := (maxb - minb + factor - 1) / factor
-	cols := make([]int64, bodyCols)
+	// Compute plot column counts by assuming each distribution
+	// bucket is uniform and resampling into columns.
+	cols := make([]int64, width)
+	colWidth := float64(maxb-minb) / float64(width)
 	for b := minb; b < maxb; b++ {
-		cols[(b-minb)/factor] += d.Buckets[b]
+		count := d.Buckets[b]
+		left, right := float64(b-minb)/colWidth, float64(b-minb+1)/colWidth
+		if right > float64(width) {
+			// Numerical error can push right just over
+			// width, which breaks loops below. Fix this.
+			right = float64(width)
+		}
+
+		// If this column is strictly in bucket, take a fast path.
+		lefti, _ := math.Modf(left)
+		righti, _ := math.Modf(right)
+		if lefti == righti {
+			cols[int(lefti)] += count
+			continue
+		}
+
+		// Distribute this bucket between left and right. To
+		// avoid cumulative error, we think of this as a line
+		// going from (left, 0) to (right, count). Each bucket
+		// contains the difference of the line between its two
+		// edges.
+		partialCount := func(x float64) int64 {
+			if x < left {
+				return 0
+			} else if x >= right {
+				return count
+			}
+			return int64(float64(count) / (right - left) * (x - left))
+		}
+		for i := int(left); i < int(math.Ceil(right)); i++ {
+			c1 := partialCount(float64(i))
+			c2 := partialCount(float64(i + 1))
+			cols[i] += c2 - c1
+		}
 	}
 
 	// Get max column value.
@@ -132,7 +159,7 @@ func (d *LatencyDist) FprintHist(w io.Writer, width, height int) {
 	fills := []rune(" ▁▂▃▄▅▆▇█")
 	cells := make([][]rune, height+2)
 	for i := range cells {
-		cells[i] = make([]rune, bodyCols)
+		cells[i] = make([]rune, width)
 		for j := range cells[i] {
 			cells[i][j] = fills[0]
 		}
@@ -164,8 +191,8 @@ func (d *LatencyDist) FprintHist(w io.Writer, width, height int) {
 	tick := time.Duration(math.Pow(xBase, math.Ceil(math.Log(float64(mint))/math.Log(xBase))))
 	tickRow, labelRow := &cells[height], &cells[height+1]
 	for {
-		col := (d.ToBucket(tick) - minb) / factor
-		if col >= bodyCols {
+		col := int(float64(d.ToBucket(tick)-minb) / colWidth)
+		if col >= width {
 			break
 		}
 
