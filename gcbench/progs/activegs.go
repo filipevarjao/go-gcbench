@@ -13,26 +13,27 @@ import (
 	"time"
 
 	"github.com/aclements/go-gcbench/gcbench"
+	"github.com/aclements/go-gcbench/gcbench/heapgen"
 )
 
 const (
 	ptrSize = 4 << (^uintptr(0) >> 63)
 
+	// The ballast has to be reasonably large (and have pointers)
+	// so concurrent mark takes more than stackPeriod.
 	ballastSize   = 100 << 20
 	garbageSize   = 10 << 20
 	garbagePeriod = 100 * time.Millisecond
 
-	stackPeriod = 50 * time.Millisecond
+	stackPeriod = 10 * time.Millisecond
 )
 
 var (
-	ballast []byte
+	ballast interface{}
 	garbage []byte
 )
 
 func churn() {
-	ballast = make([]byte, ballastSize)
-
 	for {
 		time.Sleep(garbagePeriod)
 		garbage = make([]byte, garbageSize)
@@ -77,7 +78,7 @@ func withStack1(size gcbench.Bytes, f func()) uintptr {
 var (
 	flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
 	// 5e5 Gs uses about 2.5GB of memory.
-	flagGs        = flag.Int("live-gs", 5e5, "start `n` live goroutines")
+	flagGs        = flag.Int("active-gs", 5e5, "start `n` active goroutines")
 	flagStackSize = gcbench.FlagBytes("stack-size", 1*gcbench.KB, "stack size")
 )
 
@@ -88,10 +89,13 @@ func main() {
 		os.Exit(2)
 	}
 
-	gcbench.NewBenchmark("LiveGs", benchMain).Config("live-gs", *flagGs).Config("stack-size", *flagStackSize).Run()
+	gcbench.NewBenchmark("ActiveGs", benchMain).Config("active-gs", *flagGs).Config("stack-size", *flagStackSize).Run()
 }
 
 func benchMain() {
+	m := heapgen.Measure(heapgen.MakeAST)
+	ballast = heapgen.Generate(m.Gen, m.BytesRetained, ballastSize)
+
 	var chs []chan struct{}
 
 	for i := 0; i < *flagGs; i++ {
