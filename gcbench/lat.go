@@ -105,7 +105,11 @@ func (d *LatencyDist) Quantile(q float64) time.Duration {
 	// Take the midpoint of this bucket.
 	// TODO: Assume samples are log distributed in bucket.
 	lo, hi := d.FromBucket(b)
-	return (lo + hi) / 2
+	mid := (lo + hi) / 2
+	if mid > d.Max {
+		return d.Max
+	}
+	return mid
 }
 
 type LatencyTracker struct {
