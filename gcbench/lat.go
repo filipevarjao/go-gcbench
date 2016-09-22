@@ -17,7 +17,7 @@ import (
 type LatencyDist struct {
 	N       int64
 	Max     time.Duration
-	Buckets [100]int64
+	Buckets [256]int64
 }
 
 const latencyMax = time.Second
