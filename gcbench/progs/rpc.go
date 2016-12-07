@@ -28,6 +28,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -37,9 +38,10 @@ import (
 )
 
 var (
-	flagDuration   = flag.Duration("benchtime", 10*time.Second, "steady state duration")
-	flagBallast    = gcbench.FlagBytes("ballast", 64*gcbench.MB, "retain `x` bytes of global data")
-	flagReqsPerSec = flag.Float64("reqs-per-sec", 10000, "send `rate` requests per second")
+	flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
+	flagBallast  = gcbench.FlagBytes("ballast", 64*gcbench.MB, "retain `x` bytes of global data")
+	// XXX Make this reqs-per-sec-per-p so it scales properly.
+	flagReqsPerSec = flag.Float64("reqs-per-sec", 8000, "send `rate` requests per second")
 	flagClient     = flag.String("client", "", "internal flag to act as RPC client")
 )
 
@@ -49,9 +51,6 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-
-	// TODO: Report end-to-end latency measured by the client as a
-	// metric.
 
 	if *flagClient != "" {
 		doClient(*flagClient)
@@ -64,18 +63,25 @@ func main() {
 
 var sink1 interface{}
 var requestCount int64
+var serverLatency gcbench.LatencyDist
 
 func benchMain() {
 	// Create the ballast.
 	m := heapgen.Measure(heapgen.MakeAST)
 	sink1 = heapgen.Generate(m.Gen, m.BytesRetained, int(*flagBallast))
 
+	// Divide GOMAXPROCS by two so it's split between client and
+	// server.
+	gomaxprocs := runtime.GOMAXPROCS(-1)
+	runtime.GOMAXPROCS(gomaxprocs / 2)
+
 	// Start the server.
 	l := startServer()
 
 	// Start the client.
 	client := exec.Command(os.Args[0], "-client", l.Addr().String(), "-reqs-per-sec", fmt.Sprint(*flagReqsPerSec))
-	client.Env = []string{}
+	client.Env = []string{"GODEBUG=gctrace=1", "GOGC=off",
+		fmt.Sprintf("GOMAXPROCS=%d", gomaxprocs/2)}
 	cin, err := client.StdinPipe()
 	if err != nil {
 		log.Fatal("creating client stdin pipe: ", err)
