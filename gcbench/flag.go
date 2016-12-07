@@ -9,7 +9,7 @@ import (
 	"fmt"
 )
 
-type Bytes int
+type Bytes int64
 
 var si = []string{"", "k", "M", "G", "T", "P", "E", "Z", "Y"}
 
