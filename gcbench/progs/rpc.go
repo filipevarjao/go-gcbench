@@ -92,7 +92,8 @@ func benchMain() {
 		log.Fatal("creating client stdout pipe: ", err)
 	}
 	defer cout.Close()
-	client.Stderr = os.Stderr
+	var clientOut bytes.Buffer
+	client.Stderr = &clientOut
 	err = client.Start()
 	if err != nil {
 		log.Fatal("starting client: ", err)
@@ -104,9 +105,14 @@ func benchMain() {
 	time.AfterFunc(*flagDuration, func() {
 		gcbench.ReportExtra("reqs/sec", float64(atomic.LoadInt64(&requestCount))/float64(time.Since(startTime))*float64(time.Second))
 
+		// Server-reported latency.
+		fmt.Fprintf(os.Stderr, "server-measured request latency:\n")
+		serverLatency.FprintHist(os.Stderr, 70, 5)
+
 		// Shut down client.
 		cin.Close()
 		err := client.Wait()
+		fmt.Fprintf(os.Stderr, "client stderr:\n%s", clientOut.String())
 		if err != nil {
 			log.Fatal("client failed: ", err)
 		}
@@ -145,6 +151,7 @@ func handler(c net.Conn) {
 			c.Close()
 			return
 		}
+		lt := serverLatency.Start()
 		if n != 1 || header[0] != 'x' {
 			log.Fatal("bad header: ", n, err, header)
 		}
@@ -160,6 +167,7 @@ func handler(c net.Conn) {
 		// Send the response.
 		json.NewEncoder(w).Encode(data)
 		w.Flush()
+		lt.Tick()
 	}
 }
 
