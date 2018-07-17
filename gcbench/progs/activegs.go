@@ -76,9 +76,11 @@ func benchMain() {
 		BytesPerSec: garbagePerSec,
 	}).Start()
 
-	time.AfterFunc(*flagDuration, func() { os.Exit(0) })
+	time.AfterFunc(*flagDuration, func() {
+		os.Exit(0)
+	})
 
-	for range time.Tick(stackPeriod) {
+	for _ = range time.Tick(stackPeriod) {
 		//begin := time.Now()
 		for _, ch := range chs {
 			// TODO: Report jitter here. In
