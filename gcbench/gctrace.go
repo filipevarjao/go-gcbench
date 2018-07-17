@@ -95,7 +95,8 @@ func ParseGCTrace(s string) (GCTrace, error) {
 
 		if strings.HasSuffix(line[4], " (forced)") {
 			c.Forced = true
-			line[4] = strings.TrimSuffix(line[4], " (forced)")
+			str := len(line[4])
+			line[4] = line[4][:str-9] //strings.TrimSuffix(line[4], " (forced)")
 		}
 
 		// Process parts.

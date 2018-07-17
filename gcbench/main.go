@@ -12,7 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"runtime/trace"
+//	"runtime/trace"
 	"sort"
 	"strconv"
 	"strings"
@@ -68,13 +68,14 @@ func (b *Benchmark) Run() {
 		if gcbench == b.FullName() {
 			func() {
 				if *flagTrace != "" {
-					f, err := os.Create(*flagTrace)
+					_, err := os.Create(*flagTrace)
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "error creating log file: %v\n", err)
 						os.Exit(1)
 					}
-					trace.Start(f)
-					defer trace.Stop()
+					fmt.Println("MAIN TRACE LIB")
+					//trace.Start(f)
+					//defer trace.Stop()
 				}
 				b.main()
 			}()
@@ -193,3 +194,4 @@ func sigfigs(v float64) string {
 func ReportExtra(metric string, val float64) {
 	fmt.Fprintf(os.Stderr, "metric %v %s\n", val, metric)
 }
+

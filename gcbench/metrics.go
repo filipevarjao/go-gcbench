@@ -125,9 +125,23 @@ func extract(slice interface{}, name string) interface{} {
 	if !ok {
 		panic("unknown field: " + name)
 	}
-	out := reflect.MakeSlice(reflect.SliceOf(field.Type), len, len)
+	var out reflect.Value
+	if name == "Procs" {
+		p := reflect.TypeOf(make([]int, len))
+		out = reflect.MakeSlice(p, len, len)
+	} else if name == "HeapMarked" || name == "HeapActual" || name == "HeapGoal" {
+		p := reflect.TypeOf(make([]Bytes, len))
+		out = reflect.MakeSlice(p, len, len)
+	} else if name == "CPUAssist" || name == "ClockSweepTerm" || name == "ClockMarkTerm" || name == "CPUMark" || name == "CPUBackground" || name == "ClockMark"{
+		p := reflect.TypeOf(make([]time.Duration, len))
+		out = reflect.MakeSlice(p, len, len)
+	}// else {
+	//	fmt.Println("There is someone else ", name)
+	//	out = reflect.MakeSlice(reflect.SliceOf(field.Type), len, len)
+	//}
 	for i := 0; i < len; i++ {
 		out.Index(i).Set(sv.Index(i).FieldByIndex(field.Index))
+
 	}
 	return out.Interface()
 }
@@ -141,7 +155,12 @@ func float64s(slice interface{}) []float64 {
 	len := sv.Len()
 	out := make([]float64, len)
 	for i := 0; i < len; i++ {
-		out[i] = sv.Index(i).Convert(float64Type).Float()
+//		if sv.Index(i).Type().Kind() == reflect.Int64 {
+//			fmt.Println("Original ", sv.Index(i).Type().Name(), sv.Index(i).Int())
+			
+		//n := sv.Index(i).Int()
+		out[i] = float64(sv.Index(i).Int())
+	//	out[i] = sv.Index(i).Convert(float64Type).Float()
 	}
 	return out
 }
@@ -185,3 +204,4 @@ func warnIf(compare string, threshold float64) func(string, float64) {
 		}
 	}
 }
+

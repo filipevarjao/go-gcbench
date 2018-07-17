@@ -6,7 +6,7 @@ package heapgen
 
 import (
 	"runtime"
-	"runtime/debug"
+//aqui	"runtime/debug"
 	"sync"
 )
 
@@ -44,12 +44,11 @@ func Measure(gen func() interface{}) Measurement {
 	// Measure total heap generated.
 	var mstats0 runtime.MemStats
 	runtime.ReadMemStats(&mstats0)
-	gogc := debug.SetGCPercent(-1)
+//aqui	gogc := debug.SetGCPercent(-1)
 	sink = gen()
 	var mstats1 runtime.MemStats
 	runtime.ReadMemStats(&mstats1)
-	debug.SetGCPercent(gogc)
-
+//aqui	debug.SetGCPercent(gogc)
 	// GC and measure retained heap.
 	runtime.GC()
 	runtime.GC()
@@ -83,3 +82,4 @@ func Generate(gen func() interface{}, bytes1, bytesGoal int) interface{} {
 	wg.Wait()
 	return out
 }
+
