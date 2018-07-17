@@ -12,6 +12,7 @@ import (
 	"os"
 	"runtime"
 	"time"
+	"fmt"
 
 	"github.com/aclements/go-gcbench/gcbench"
 )
@@ -21,6 +22,8 @@ var sink []*byte
 var flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
 
 func main() {
+	memstats := new(runtime.MemStats)
+	start := time.Now()
 	flag.Parse()
 	if flag.NArg() > 0 {
 		flag.Usage()
@@ -28,6 +31,9 @@ func main() {
 	}
 
 	gcbench.NewBenchmark("SmallHeap", benchMain).Run()
+	elapsed := time.Since(start)
+	fmt.Print("time: ", elapsed)
+	printMemStats(memstats)
 }
 
 func benchMain() {
@@ -43,3 +49,12 @@ func benchMain() {
 	<-time.After(*flagDuration)
 	os.Exit(0)
 }
+
+func printMemStats(memstats *runtime.MemStats) {
+   runtime.ReadMemStats(memstats)
+   fmt.Print(" | TotalAlloc ", memstats.TotalAlloc)
+   fmt.Print(" | mallocs ", memstats.Mallocs)
+   fmt.Print(" | frees ", memstats.Mallocs - memstats.Frees)
+   fmt.Println(" | GC cycles ", memstats.NumGC)
+}
+

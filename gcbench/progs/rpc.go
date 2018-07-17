@@ -46,6 +46,8 @@ var (
 )
 
 func main() {
+	memstats := new(runtime.MemStats)
+	start := time.Now()
 	flag.Parse()
 	if flag.NArg() > 0 {
 		flag.Usage()
@@ -59,6 +61,10 @@ func main() {
 
 	name := "RPC"
 	gcbench.NewBenchmark(name, benchMain).Config("reqs-per-sec", *flagReqsPerSec).Config("ballast", *flagBallast).Run()
+	elapsed := time.Since(start)
+	fmt.Print("time: ", elapsed)
+	printMemStats(memstats)
+
 }
 
 var sink1 interface{}
@@ -302,4 +308,12 @@ func sendOneRequest(addr string, wg *sync.WaitGroup, lat *gcbench.LatencyDist) {
 	conns.Lock()
 	conns.q = append(conns.q, c)
 	conns.Unlock()
+}
+
+func printMemStats(memstats *runtime.MemStats) {
+   runtime.ReadMemStats(memstats)
+   fmt.Print(" | TotalAlloc ", memstats.TotalAlloc)
+   fmt.Print(" | mallocs ", memstats.Mallocs)
+   fmt.Print(" | frees ", memstats.Mallocs - memstats.Frees)
+   fmt.Println(" | GC cycles ", memstats.NumGC)
 }

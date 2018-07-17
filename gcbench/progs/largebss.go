@@ -9,6 +9,8 @@ import (
 	"flag"
 	"os"
 	"time"
+	"fmt"
+	"runtime"
 
 	"github.com/aclements/go-gcbench/gcbench"
 )
@@ -34,7 +36,13 @@ var sink interface{}
 var flagDuration = flag.Duration("benchtime", 10*time.Second, "steady state duration")
 
 func main() {
+	memstats := new(runtime.MemStats)
+	start := time.Now()
+
 	gcbench.NewBenchmark("LargeBSS", benchMain).Config("bss", bss).Run()
+	elapsed := time.Since(start)
+	fmt.Print("time: ", elapsed)
+	printMemStats(memstats)
 }
 
 func benchMain() {
@@ -53,3 +61,12 @@ func benchMain() {
 		sink = make([]byte, 1<<10)
 	}
 }
+
+func printMemStats(memstats *runtime.MemStats) {
+   runtime.ReadMemStats(memstats)
+   fmt.Print(" | TotalAlloc ", memstats.TotalAlloc)
+   fmt.Print(" | mallocs ", memstats.Mallocs)
+   fmt.Print(" | frees ", memstats.Mallocs - memstats.Frees)
+   fmt.Println(" | GC cycles ", memstats.NumGC)
+}
+

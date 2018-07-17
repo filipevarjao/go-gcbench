@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"fmt"
 
 	"github.com/aclements/go-gcbench/gcbench"
 )
@@ -45,6 +46,9 @@ var (
 )
 
 func main() {
+	memstats := new(runtime.MemStats)
+	start := time.Now()
+
 	flag.Parse()
 	if flag.NArg() > 0 {
 		flag.Usage()
@@ -52,6 +56,10 @@ func main() {
 	}
 
 	gcbench.NewBenchmark("StackShrink", benchMain).Config("gs", *flagGs).Config("low", *flagLow).Config("high", *flagHigh).Run()
+	elapsed := time.Since(start)
+	fmt.Print("time: ", elapsed)
+	printMemStats(memstats)
+
 }
 
 func benchMain() {
@@ -98,3 +106,12 @@ func benchMain() {
 		phase.Wait()
 	}
 }
+
+func printMemStats(memstats *runtime.MemStats) {
+   runtime.ReadMemStats(memstats)
+   fmt.Print(" | TotalAlloc ", memstats.TotalAlloc)
+   fmt.Print(" | mallocs ", memstats.Mallocs)
+   fmt.Print(" | frees ", memstats.Mallocs - memstats.Frees)
+   fmt.Println(" | GC cycles ", memstats.NumGC)
+}
+

@@ -11,7 +11,8 @@ import (
 	"flag"
 	"os"
 	"time"
-
+	"runtime"
+	"fmt"
 	"github.com/aclements/go-gcbench/gcbench"
 	"github.com/aclements/go-gcbench/gcbench/heapgen"
 )
@@ -45,6 +46,8 @@ var (
 )
 
 func main() {
+	memstats := new(runtime.MemStats)
+	start := time.Now()
 	flag.Parse()
 	if flag.NArg() > 0 {
 		flag.Usage()
@@ -52,6 +55,9 @@ func main() {
 	}
 
 	gcbench.NewBenchmark("ActiveGs", benchMain).Config("active-gs", *flagGs).Config("stack-size", *flagStackSize).Run()
+	elapsed := time.Since(start)
+	fmt.Print("time: ", elapsed)
+	printMemStats(memstats)
 }
 
 func benchMain() {
@@ -83,3 +89,12 @@ func benchMain() {
 		//fmt.Println("loop took", time.Since(begin))
 	}
 }
+
+func printMemStats(memstats *runtime.MemStats) {
+   runtime.ReadMemStats(memstats)
+   fmt.Print(" | TotalAlloc ", memstats.TotalAlloc)
+   fmt.Print(" | mallocs ", memstats.Mallocs)
+   fmt.Print(" | frees ", memstats.Mallocs - memstats.Frees)
+   fmt.Println(" | GC cycles ", memstats.NumGC)
+}
+
